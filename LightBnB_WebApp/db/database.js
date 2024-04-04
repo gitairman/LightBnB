@@ -26,7 +26,6 @@ const getUserWithEmail = function (email) {
   return pool
     .query(`SELECT * FROM users WHERE email = $1;`, [email])
     .then((result) => {
-      console.log(result.rows[0]);
       return result.rows[0];
     })
     .catch((err) => {
@@ -51,7 +50,6 @@ const getUserWithId = function (id) {
   return pool
     .query(`SELECT * FROM users WHERE id = $1;`, [id])
     .then((result) => {
-      console.log(result.rows[0]);
       return result.rows[0];
     })
     .catch((err) => {
@@ -75,7 +73,6 @@ const addUser = function (user) {
   return pool
     .query(queryString, values)
     .then((result) => {
-      console.log(result.rows[0]);
       return result.rows[0];
     })
     .catch((err) => {
@@ -95,7 +92,25 @@ const addUser = function (user) {
  * @return {Promise<[{}]>} A promise to the reservations.
  */
 const getAllReservations = function (guest_id, limit = 10) {
-  return getAllProperties(null, 2);
+  const queryString = `
+    SELECT properties.*, AVG(rating) as average_rating, reservations.*
+    FROM properties
+    JOIN reservations ON reservations.property_id=properties.id
+    JOIN property_reviews on property_reviews.property_id=properties.id
+    WHERE reservations.guest_id = $1
+    GROUP BY reservations.id, properties.id
+    ORDER BY start_date
+    LIMIT $2;
+  `;
+  const values = [Number(guest_id), limit];
+  return pool
+    .query(queryString, values)
+    .then((result) => {
+      return result.rows;
+    })
+    .catch((err) => {
+      console.log(err.message);
+    });
 };
 
 /// Properties
@@ -107,10 +122,17 @@ const getAllReservations = function (guest_id, limit = 10) {
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = function (options, limit = 10) {
+  const queryString = `
+    SELECT properties.*, AVG(rating) as average_rating
+    FROM properties 
+    JOIN property_reviews on property_reviews.property_id=properties.id
+    GROUP BY properties.id
+    LIMIT $1;
+  `;
+  const values = [limit];
   return pool
-    .query(`SELECT * FROM properties LIMIT $1;`, [limit])
+    .query(queryString, values)
     .then((result) => {
-      console.log(result.rows);
       return result.rows;
     })
     .catch((err) => {
