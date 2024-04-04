@@ -122,14 +122,60 @@ const getAllReservations = function (guest_id, limit = 10) {
  * @return {Promise<[{}]>}  A promise to the properties.
  */
 const getAllProperties = function (options, limit = 10) {
-  const queryString = `
+  const {
+    city,
+    owner_id,
+    minimum_price_per_night,
+    maximum_price_per_night,
+    minimum_rating,
+  } = options;
+
+  const values = [];
+  let queryString = `
     SELECT properties.*, AVG(rating) as average_rating
     FROM properties 
     JOIN property_reviews on property_reviews.property_id=properties.id
-    GROUP BY properties.id
-    LIMIT $1;
+    `;
+
+  let isWhereThere = false;
+  if (city) {
+    values.push(`%${city}%`);
+    queryString += `WHERE city LIKE $${values.length} `;
+    isWhereThere = true;
+  }
+  if (owner_id) {
+    values.push(Number(owner_id));
+    queryString += `${isWhereThere ? 'AND' : 'WHERE'} owner_id = $${
+      values.length
+    } `;
+    isWhereThere = true;
+  }
+  if (minimum_price_per_night) {
+    values.push(Number(minimum_price_per_night) * 100);
+    queryString += `${isWhereThere ? 'AND' : 'WHERE'} cost_per_night >= $${
+      values.length
+    } `;
+    isWhereThere = true;
+  }
+  if (maximum_price_per_night) {
+    values.push(Number(maximum_price_per_night) * 100);
+    queryString += `${isWhereThere ? 'AND' : 'WHERE'} cost_per_night <= $${
+      values.length
+    } `;
+    isWhereThere = true;
+  }
+
+  queryString += `GROUP BY properties.id`;
+
+  if (minimum_rating) {
+    values.push(Number(minimum_rating));
+    queryString += ` HAVING AVG(rating) >= $${values.length} `;
+  }
+
+  values.push(limit);
+  queryString += `
+    LIMIT $${values.length};
   `;
-  const values = [limit];
   return pool
     .query(queryString, values)
     .then((result) => {
